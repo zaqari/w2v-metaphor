@@ -29,6 +29,10 @@ class antonym_finder():
 
     def return_df(self):
         return pd.DataFrame(np.array(self.dic.items()).reshape(-1,2), columns=['key', 'value'])
+    
+    def save_df(self, save_file_path):
+        df = pd.DataFrame(np.array(list(self.dic.items())).reshape(-1,2), columns=['lex', 'antonym'])
+        df.to_csv(save_file_path, index=False, encoding='utf-8')
 
 
 
