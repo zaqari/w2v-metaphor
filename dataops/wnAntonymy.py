@@ -34,7 +34,6 @@ class antonym_list_builder():
         df = pd.DataFrame(np.array(list(self.dic.items())).reshape(-1,2), columns=['lex', 'antonym'])
         df.to_csv(save_file_path, index=False, encoding='utf-8')
 
-
 class orthoganal_antonyms(mb.axComp):
 
     def __init__(self, w1, w2, data, vec_size=768):
@@ -77,7 +76,6 @@ class orthoganal_antonyms(mb.axComp):
         #    items in our vocabulary
         vocabulary = torch.zeros(size=(len(self.vocab), self.vec_size))
         for i, w in enumerate(self.vocab.values):
-            # (1.2) Each axis is the subtraction of the antonym pair
             vocabulary[i] = self.lexeme(w[0]).detach().sum(dim=0).view(-1) - self.lexeme(w[1]).detach().sum(dim=0).view(-1)
         print('vocaulary of shape {} calculated'.format(vocabulary.shape))
 
@@ -86,8 +84,6 @@ class orthoganal_antonyms(mb.axComp):
 
         #(3) Convert results from step (2) into a dataframe
         self.matrix = pd.DataFrame(cossim, columns=self.vocab)
-        
-        # (3.2) Generate axes labels from the vocab list
         vocab_names = ['<-v->'.join(i) for i in self.vocab.values]
         self.matrix.columns = vocab_names
         self.matrix['lex'] = vocab_names
@@ -99,35 +95,60 @@ class orthoganal_antonyms(mb.axComp):
     def import_similarity_matrix(self, datapath):
         self.matrix = pd.read_csv(datapath)
 
-
     def generate_axes(self, max_similarity=.5):
         open_columns = self.matrix['lex'].unique().tolist()
 
         interpretable_axes = []
 
-        #(1) Randomly select columns for comparison
+        # (1) Randomly select columns for comparison
         column_order = np.random.choice(open_columns, size=len(open_columns), replace=False)
         for col in column_order:
             if col in open_columns:
-                #if the item is in the available list of columns, we'll proceed. But first, 
+                # if the item is in the available list of columns, we'll proceed. But first,
                 # we remove it from the list to avoid future issues.
                 interpretable_axes.append(open_columns.pop(col))
-                
-                #I believe this is correct. Because the magnitude in cosine space defines 
-                # directionality of the vector, but not similarity (.5 and -.5 are both 50% 
+
+                # I believe this is correct. Because the magnitude in cosine space defines
+                # directionality of the vector, but not similarity (.5 and -.5 are both 50%
                 # similar, but -.5 is going in the opposite direction) I opt to use the .abs()
                 # of the values in the matrix.
                 distant_axes = self.matrix[col].values.__abs__()
-                #This little bit of linear algebra makes it so that values that are above our
+                # This little bit of linear algebra makes it so that values that are above our
                 # cutoff for maxmimum similarity end up being even higher and thus pushed to
-                # the end of the step in which we sort our values from smallest cosine 
+                # the end of the step in which we sort our values from smallest cosine
                 # similarity to largest.
                 distant_axes = ((distant_axes > max_similarity) == 0) + distant_axes
 
-                #Now, we sort our values, and remove and values that are not in the available
+                # Now, we sort our values, and remove and values that are not in the available
                 # columns to select from. We then pick the smallest one of these values and send
                 # it to interpretable axes.
-                selection = [i for i in axes.matrix['lex'].values[distant_axes.argsort()] if i in open_columns][0]
+                selection = [i for i in self.matrix['lex'].values[distant_axes.argsort()] if i in open_columns][0]
                 interpretable_axes.append(selection)
+
+        return interpretable_axes
+
+    def viterbi_walk_generate_axes(self, max_similarity=.5, n_steps=300):
+        """
+        Uses a viterbi like algorithm to "walk" through the matrix
+        and select the items that have the lowest cosine similarity
+        that it hasn't seen yet.
+
+        :param max_similarity:
+        :param n_steps:
+        :return:
+        """
+
+        open_columns = self.matrix['lex'].unique().tolist()
+
+        current_column = np.random.choice(open_columns[:-1], size=1, replace=False)[0]
+        interpretable_axes = [current_column]
+
+        for _ in n_steps:
+            vals = self.matrix[current_column].loc[~self.matrix['lex'].isin(interpretable_axes) & self.matrix[current_column] < max_similarity].values.abs()
+            delta_minimum = self.matrix[current_column] == min(vals)
+
+            current_column = str(self.matrix['lex'].loc[delta_minimum])
+
+            interpretable_axes.append(current_column)
 
         return interpretable_axes
