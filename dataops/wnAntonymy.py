@@ -77,6 +77,7 @@ class orthoganal_antonyms(mb.axComp):
         #    items in our vocabulary
         vocabulary = torch.zeros(size=(len(self.vocab), self.vec_size))
         for i, w in enumerate(self.vocab.values):
+            # (1.2) Each axis is the subtraction of the antonym pair
             vocabulary[i] = self.lexeme(w[0]).detach().sum(dim=0).view(-1) - self.lexeme(w[1]).detach().sum(dim=0).view(-1)
         print('vocaulary of shape {} calculated'.format(vocabulary.shape))
 
@@ -85,6 +86,8 @@ class orthoganal_antonyms(mb.axComp):
 
         #(3) Convert results from step (2) into a dataframe
         self.matrix = pd.DataFrame(cossim, columns=self.vocab)
+        
+        # (3.2) Generate axes labels from the vocab list
         vocab_names = ['<-v->'.join(i) for i in self.vocab.values]
         self.matrix.columns = vocab_names
         self.matrix['lex'] = vocab_names
@@ -102,20 +105,29 @@ class orthoganal_antonyms(mb.axComp):
 
         interpretable_axes = []
 
-        #(1) Randomly select columns. Per each column, return the
-        #    minimum cosine similarity.
-
+        #(1) Randomly select columns for comparison
         column_order = np.random.choice(open_columns, size=len(open_columns), replace=False)
         for col in column_order:
             if col in open_columns:
-                open_columns.pop(col)
-
+                #if the item is in the available list of columns, we'll proceed. But first, 
+                # we remove it from the list to avoid future issues.
+                interpretable_axes.append(open_columns.pop(col))
+                
+                #I believe this is correct. Because the magnitude in cosine space defines 
+                # directionality of the vector, but not similarity (.5 and -.5 are both 50% 
+                # similar, but -.5 is going in the opposite direction) I opt to use the .abs()
+                # of the values in the matrix.
                 distant_axes = self.matrix[col].values.__abs__()
+                #This little bit of linear algebra makes it so that values that are above our
+                # cutoff for maxmimum similarity end up being even higher and thus pushed to
+                # the end of the step in which we sort our values from smallest cosine 
+                # similarity to largest.
                 distant_axes = ((distant_axes > max_similarity) == 0) + distant_axes
 
-                #(2) Pop the column name and the name for the item
-                #    returned in (1) to interpretable_axes.
-                selection = self.matrix['lex'].loc[self.matrix['lex'].isin(open_columns) & distant_axes.argsort()].values[0]
+                #Now, we sort our values, and remove and values that are not in the available
+                # columns to select from. We then pick the smallest one of these values and send
+                # it to interpretable axes.
+                selection = [i for i in axes.matrix['lex'].values[distant_axes.argsort()] if i in open_columns][0]
                 interpretable_axes.append(selection)
 
         return interpretable_axes
