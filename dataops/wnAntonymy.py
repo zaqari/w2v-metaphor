@@ -125,7 +125,9 @@ class orthoganal_antonyms(mb.axComp):
                 selection = [i for i in self.matrix['lex'].values[distant_axes.argsort()] if i in open_columns][0]
                 interpretable_axes.append(selection)
 
-        return interpretable_axes    def viterbi_walk_generate_axes(self, max_similarity=.5, n_steps=300):
+        return interpretable_axes
+
+    def viterbi_walk_generate_axes(self, max_similarity=.5, n_steps=300):
         """
         Uses a viterbi like algorithm to "walk" through the matrix
         and select the items that have the lowest cosine similarity
@@ -139,12 +141,14 @@ class orthoganal_antonyms(mb.axComp):
         open_columns = self.matrix['lex'].unique().tolist()
 
         current_column = np.random.choice(open_columns[:-1], size=1, replace=False)[0]
-        interpretable_axes = [open_columns.pop(current_column)]
+        interpretable_axes = [open_columns.pop(open_columns.index(current_column))]
 
         for _ in range(n_steps):
             x = self.matrix[current_col].loc[~self.matrix['lex'].isin(interpretable_axes)].values
+            
             z = self.matrix[interpretable_axes].loc[self.matrix[current_col].isin(x)].values.sum(axis=1)
-            xz = x + z
+            
+            xz = x + z + (x > max_similarity)
 
             organized = self.matrix['lex'].loc[self.matrix[current_col].isin(x)].values[xz.argsort()]
             current_col = [col for col in organized if col in open_columns][0]
