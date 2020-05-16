@@ -141,14 +141,13 @@ class orthoganal_antonyms(mb.axComp):
         open_columns = self.matrix['lex'].unique().tolist()
 
         current_column = np.random.choice(open_columns[:-1], size=1, replace=False)[0]
-        interpretable_axes = [current_column]
+        interpretable_axes = [open_columns.pop(current_column)]
 
-        for _ in n_steps:
-            vals = self.matrix[current_column].loc[~self.matrix['lex'].isin(interpretable_axes) & self.matrix[current_column] < max_similarity].values.abs()
-            delta_minimum = self.matrix[current_column] == min(vals)
-
-            current_column = str(self.matrix['lex'].loc[delta_minimum])
-
-            interpretable_axes.append(current_column)
+        for _ in range(n_steps):
+            x = self.matrix[current_col].values + np.isin(self.matrix['lex'].values, interpretable_axes) + (self.matrix[current_col].values > max_similarity)
+            z = self.matrix[interpretable_axes].values[x.argsort()].sum(axis=1)
+            xz = self.matrix['lex'].values[x.argsort()][z.argsort()]
+            current_col = [col for col in xz if col in open_columns][0]
+            interpretable_axes.append(open_columns.pop(current_col))
 
         return interpretable_axes
