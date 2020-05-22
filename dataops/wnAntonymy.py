@@ -80,7 +80,7 @@ class orthoganal_antonyms(mb.axComp):
         print('vocaulary of shape {} calculated'.format(vocabulary.shape))
 
         #(2) Generate Cosine Similarity Matrix for each lexeme compared to total dataset.
-        cossim = np.array([self.cos(i, vocabulary).view(-1).tolist() for i in vocabulary]).reshape(-1, len(vocabulary))
+        cossim = np.array([self.cos(i, vocabulary).view(-1).tolist() for i in vocabulary]).reshape(-1, len(vocabulary)).abs()
 
         #(3) Convert results from step (2) into a dataframe
         self.matrix = pd.DataFrame(cossim, columns=self.vocab)
@@ -148,7 +148,7 @@ class orthoganal_antonyms(mb.axComp):
             
             z = self.matrix[interpretable_axes].loc[self.matrix[current_col].isin(x)].values.sum(axis=1)
             
-            xz = x + z + (x > max_similarity)
+            xz = x + z + (x >= max_similarity)
 
             organized = self.matrix['lex'].loc[self.matrix[current_col].isin(x)].values[xz.argsort()]
             current_col = [col for col in organized if col in open_columns][0]
