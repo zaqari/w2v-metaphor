@@ -127,32 +127,45 @@ class orthoganal_antonyms(mb.axComp):
 
         return interpretable_axes
 
+
     def viterbi_walk_generate_axes(self, max_similarity=.5, n_steps=300):
         """
         Uses a viterbi like algorithm to "walk" through the matrix
         and select the items that have the lowest cosine similarity
         that it hasn't seen yet.
 
-        :param max_similarity:
-        :param n_steps:
-        :return:
+        :param max_similarity: a value for the maximum similarity we want to consider when comparing items. This is a soft value, in that it penalizes values higher than the max similarity rather than omitting them.
+        :param n_steps: the number of steps we want to take when generating our axes.
+        :return: a list of axes that are maximally orthogonal.
         """
 
         open_columns = self.matrix['lex'].unique().tolist()
 
-        current_column = np.random.choice(open_columns[:-1], size=1, replace=False)[0]
-        interpretable_axes = [open_columns.pop(open_columns.index(current_column))]
+        current_col = np.random.choice(open_columns[:-1], size=1, replace=False)[0]
+        interpretable_axes = [open_columns.pop(open_columns.index(current_col))]
 
         for _ in range(n_steps):
+            #first, take all the cosing similirities for the
+            # items that are on the table for the current step
             x = self.matrix[current_col].loc[~self.matrix['lex'].isin(interpretable_axes)].values
-            
-            z = self.matrix[interpretable_axes].loc[self.matrix[current_col].isin(x)].values.sum(axis=1)
-            
-            xz = x + z + (x >= max_similarity)
 
-            organized = self.matrix['lex'].loc[self.matrix[current_col].isin(x)].values[xz.argsort()]
+            #then, selects all the cosine similaries for items
+            # that are on the table, for PRIOR axis steps too.
+            z = self.matrix[interpretable_axes[:-1]].loc[~self.matrix['lex'].isin(interpretable_axes)].values.sum(axis=1)
+
+            #we then sum x and z to find what items have the
+            # lowest similarity to existing axes,and also
+            # penalize selection of items that are closer than
+            # our max similarity to the current axis.
+            xz = x + z + (x > max_similarity)
+
+            #we sort and then select our new current axis for
+            # comparison.
+            organized = self.matrix['lex'].loc[~self.matrix['lex'].isin(interpretable_axes)].values[xz.argsort()]
             current_col = [col for col in organized if col in open_columns][0]
 
+            #pop the new axis of comparison, from open axes list,
+            # and add it to our interpretable_axes list.
             interpretable_axes.append(open_columns.pop(open_columns.index(current_col)))
 
         return interpretable_axes
